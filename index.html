@@ -33,14 +33,15 @@ function reset(){bird={x:120,y:H/2-60,vy:0,r:17,wing:0};pipes=[];score=0;}
 reset();
 
 // --- Mic ---
-let analyser,buf,micOn=false,level=0,above=false,lastFlap=0;
+let ac,analyser,buf,micOn=false,level=0,above=false,lastFlap=0;
 async function startMic(){
+  if(ac&&ac.state==='suspended')ac.resume();
   if(micOn)return;
   try{
     const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    ac=new (window.AudioContext||window.webkitAudioContext)();
     const src=ac.createMediaStreamSource(s);analyser=ac.createAnalyser();analyser.fftSize=1024;
-    buf=new Float32Array(analyser.fftSize);src.connect(analyser);micOn=true;
+    buf=new Float32Array(analyser.fftSize);src.connect(analyser);micOn=true;if(ac.state==='suspended')ac.resume();
   }catch(e){console.warn('Mic unavailable',e);}
 }
 function threshold(){return 0.32-document.getElementById('sens').value/100*0.3;} // 0.02..0.32 RMS
@@ -159,7 +160,11 @@ function draw(){
     text('GAME OVER',220,52);text('Score '+score,290,32,5);text('Best '+best,330,26,5);
     if(performance.now()-deadT>900)text('Shout or tap to retry',H/2+60,24,5);}
 }
-(function loop(){update();draw();requestAnimationFrame(loop);})();
+// fixed 60Hz timestep so physics are identical on 60/90/120Hz screens
+let last=performance.now(),acc=0;
+(function loop(now){now=now||performance.now();acc+=Math.min(100,now-last);last=now;
+  while(acc>=1000/60){update();acc-=1000/60;}draw();requestAnimationFrame(loop);})();
+startMic(); // ask for mic right away so no tap is needed where the browser allows it
 </script>
 </body>
 </html>
